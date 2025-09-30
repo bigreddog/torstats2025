@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TOR2025 Race Statistics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/fill/style.css" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="container">
+    <header class="header">
+      <h1 class="title">TOR2025 Race Statistics</h1>
+      <div class="race-toggle">
+        <button class="race-toggle-btn active" data-race="tor330">TOR330</button>
+        <button class="race-toggle-btn" data-race="tor450">TOR450</button>
+      </div>
+      <p class="subtitle">Timing breakdown by checkpoint across all participants</p>
+    </header>
+
+    <div id="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading race data...</p>
+    </div>
+
+    <div id="error" class="error-state" style="display: none;">
+      <i class="ph ph-warning-circle"></i>
+      <p id="error-message"></p>
+    </div>
+
+    <div id="content" style="display: none;">
+      <div class="filters-container" id="filters-container">
+        <div class="filter-group search-filter-group">
+          <label for="search-filter">Search Participants <span class="search-hint-inline">Example: Smith, 123, Jones</span></label>
+          <input 
+            type="text" 
+            id="search-filter" 
+            placeholder="Search by name or bib number (comma-separated for multiple)"
+          />
+        </div>
+        <div class="filter-group">
+          <label for="category-filter">Category</label>
+          <select id="category-filter">
+            <option value="">All Categories</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="sex-filter">Sex</label>
+          <select id="sex-filter">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="country-filter">Country</label>
+          <select id="country-filter">
+            <option value="">All Countries</option>
+          </select>
+        </div>
+        <button id="reset-filters" class="reset-button">Reset Filters</button>
+      </div>
+      <div class="chart-container">
+        <svg id="chart"></svg>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    // Determine which data file to load based on URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const race = urlParams.get('race') || 'tor330';
+    const dataFile = race === 'tor330' ? 'data-tor330.js' : 'data-tor450.js';
+    document.write('<script id="data-script" src="' + dataFile + '"><\/script>');
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>
