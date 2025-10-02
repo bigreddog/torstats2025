@@ -433,7 +433,7 @@ function renderDistributionChart() {
   
   // Convert times to hours and bin them
   const hourlyData = {};
-  finishers.forEach(participant => {
+  finishers.forEach((participant, idx) => {
     // totalTime is in format "X days HH:MM:SS.mmm" or "HH:MM:SS.mmm"
     let totalSeconds = 0;
     if (typeof participant.totalTime === 'string') {
@@ -451,6 +451,14 @@ function renderDistributionChart() {
           const seconds = parseInt(timeMatch[3]);
           
           totalSeconds = days * 86400 + hours * 3600 + minutes * 60 + seconds;
+          
+          // Debug first finisher
+          if (idx === 0) {
+            console.log('First finisher raw time:', timeStr);
+            console.log('Parsed - days:', days, 'hours:', hours, 'minutes:', minutes, 'seconds:', seconds);
+            console.log('Total seconds:', totalSeconds);
+            console.log('Calculated hour bucket:', Math.floor(totalSeconds / 3600));
+          }
         }
       } else {
         // Just "HH:MM:SS" format
@@ -470,6 +478,10 @@ function renderDistributionChart() {
   // Find the range of hours (from 0 to max hour with finishers)
   const maxHour = Math.max(...Object.keys(hourlyData).map(h => parseInt(h)));
   
+  console.log('Hour 65 count:', hourlyData[65]);
+  console.log('Hour 66 count:', hourlyData[66]);
+  console.log('All hours with data:', Object.keys(hourlyData).sort((a, b) => a - b));
+  
   // Create complete data array from 0 to maxHour, filling in zeros for empty slots
   const data = [];
   for (let hour = 0; hour <= maxHour; hour++) {
@@ -480,6 +492,7 @@ function renderDistributionChart() {
   }
   
   console.log('Distribution data (with gaps filled):', data);
+  console.log('Data entries 64-67:', data.slice(64, 68));
   
   // Dimensions - use a minimum width if container width is 0
   const containerWidth = container.clientWidth || 800;
@@ -509,6 +522,7 @@ function renderDistributionChart() {
   
   // Axes
   const xAxis = d3.axisBottom(xScale)
+    .tickValues(data.filter((d, i) => i % 5 === 0).map(d => d.hour))
     .tickFormat(d => `${d}`);
   
   const yAxis = d3.axisLeft(yScale)
