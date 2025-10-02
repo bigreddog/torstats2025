@@ -29,6 +29,8 @@ const categoryFilterEl = document.getElementById('category-filter');
 const sexFilterEl = document.getElementById('sex-filter');
 const countryFilterEl = document.getElementById('country-filter');
 const resetFiltersEl = document.getElementById('reset-filters');
+const distributionToggleEl = document.getElementById('distribution-toggle');
+const distributionChartContainerEl = document.getElementById('distribution-chart-container');
 
 // Utility functions
 function showLoading() {
@@ -396,6 +398,198 @@ function resetFilters() {
   renderVisualization();
 }
 
+// Render distribution chart
+function renderDistributionChart() {
+  const svg = d3.select('#distribution-chart');
+  const container = document.getElementById('distribution-chart-container');
+  
+  console.log('Rendering distribution chart, container width:', container.clientWidth);
+  console.log('Total processed data:', processedData.length);
+  console.log('Sample participant:', processedData[0]);
+  
+  // Filter only finishers (those with totalTime AND a valid position - not DNF)
+  const finishers = processedData.filter(d => {
+    const hasTime = d.totalTime && d.totalTime !== null && d.totalTime !== undefined;
+    const hasPosition = d.position !== null && d.position !== undefined;
+    return hasTime && hasPosition;
+  });
+  
+  console.log('Finishers found:', finishers.length);
+  if (finishers.length > 0) {
+    console.log('Sample finisher totalTime:', finishers[0].totalTime, 'type:', typeof finishers[0].totalTime);
+    console.log('Sample finisher position:', finishers[0].position);
+  }
+  
+  if (finishers.length === 0) {
+    svg.selectAll('*').remove();
+    svg.append('text')
+      .attr('x', '50%')
+      .attr('y', '50%')
+      .attr('text-anchor', 'middle')
+      .attr('fill', 'var(--muted-foreground)')
+      .text('No finisher data available');
+    return;
+  }
+  
+  // Convert times to hours and bin them
+  const hourlyData = {};
+  finishers.forEach(participant => {
+    // totalTime is in format "X days HH:MM:SS.mmm" or "HH:MM:SS.mmm"
+    let totalSeconds = 0;
+    if (typeof participant.totalTime === 'string') {
+      const timeStr = participant.totalTime;
+      
+      // Check if it includes days
+      if (timeStr.includes('days') || timeStr.includes('day')) {
+        const dayMatch = timeStr.match(/(\d+)\s+days?/);
+        const timeMatch = timeStr.match(/(\d+):(\d+):(\d+)/);
+        
+        if (dayMatch && timeMatch) {
+          const days = parseInt(dayMatch[1]);
+          const hours = parseInt(timeMatch[1]);
+          const minutes = parseInt(timeMatch[2]);
+          const seconds = parseInt(timeMatch[3]);
+          
+          totalSeconds = days * 86400 + hours * 3600 + minutes * 60 + seconds;
+        }
+      } else {
+        // Just "HH:MM:SS" format
+        const parts = timeStr.split(':');
+        if (parts.length >= 3) {
+          totalSeconds = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2]);
+        }
+      }
+    } else {
+      totalSeconds = participant.totalTime;
+    }
+    
+    const hours = Math.floor(totalSeconds / 3600);
+    hourlyData[hours] = (hourlyData[hours] || 0) + 1;
+  });
+  
+  // Find the range of hours (from 0 to max hour with finishers)
+  const maxHour = Math.max(...Object.keys(hourlyData).map(h => parseInt(h)));
+  
+  // Create complete data array from 0 to maxHour, filling in zeros for empty slots
+  const data = [];
+  for (let hour = 0; hour <= maxHour; hour++) {
+    data.push({
+      hour: hour,
+      count: hourlyData[hour] || 0
+    });
+  }
+  
+  console.log('Distribution data (with gaps filled):', data);
+  
+  // Dimensions - use a minimum width if container width is 0
+  const containerWidth = container.clientWidth || 800;
+  const width = Math.max(containerWidth - 40, 400);
+  const height = 300;
+  const margin = { top: 20, right: 40, bottom: 60, left: 60 }; // Increased bottom margin for rotated labels
+  const chartWidth = width - margin.left - margin.right;
+  const chartHeight = height - margin.top - margin.bottom;
+  
+  // Clear previous chart
+  svg.selectAll('*').remove();
+  svg.attr('viewBox', `0 0 ${width} ${height}`);
+  
+  const g = svg.append('g')
+    .attr('transform', `translate(${margin.left},${margin.top})`);
+  
+  // Scales
+  const xScale = d3.scaleBand()
+    .domain(data.map(d => d.hour))
+    .range([0, chartWidth])
+    .padding(0.2);
+  
+  const yScale = d3.scaleLinear()
+    .domain([0, d3.max(data, d => d.count)])
+    .nice()
+    .range([chartHeight, 0]);
+  
+  // Axes
+  const xAxis = d3.axisBottom(xScale)
+    .tickFormat(d => `${d}`);
+  
+  const yAxis = d3.axisLeft(yScale)
+    .ticks(5);
+  
+  g.append('g')
+    .attr('class', 'axis')
+    .attr('transform', `translate(0,${chartHeight})`)
+    .call(xAxis)
+    .selectAll('text')
+    .style('font-size', '11px')
+    .style('text-anchor', 'end')
+    .attr('dx', '-1em')
+    .attr('dy', '.5em')
+    .attr('transform', 'rotate(-90)');
+  
+  g.append('g')
+    .attr('class', 'axis')
+    .call(yAxis)
+    .selectAll('text')
+    .style('font-size', '12px');
+  
+  // Axis labels
+  g.append('text')
+    .attr('x', chartWidth / 2)
+    .attr('y', chartHeight + 50)
+    .attr('text-anchor', 'middle')
+    .style('font-size', '14px')
+    .style('font-weight', '600')
+    .style('fill', 'var(--foreground)')
+    .text('Finish Time (hours)');
+  
+  g.append('text')
+    .attr('transform', 'rotate(-90)')
+    .attr('x', -chartHeight / 2)
+    .attr('y', -45)
+    .attr('text-anchor', 'middle')
+    .style('font-size', '14px')
+    .style('font-weight', '600')
+    .style('fill', 'var(--foreground)')
+    .text('Number of Finishers');
+  
+  // Bars
+  g.selectAll('.bar')
+    .data(data)
+    .enter()
+    .append('rect')
+    .attr('class', 'bar')
+    .attr('x', d => xScale(d.hour))
+    .attr('y', d => yScale(d.count))
+    .attr('width', xScale.bandwidth())
+    .attr('height', d => chartHeight - yScale(d.count))
+    .attr('fill', 'var(--primary)')
+    .attr('opacity', 0.8)
+    .style('cursor', 'pointer')
+    .on('mouseenter', function(event, d) {
+      d3.select(this)
+        .attr('opacity', 1)
+        .attr('fill', 'var(--accent)');
+    })
+    .on('mouseleave', function() {
+      d3.select(this)
+        .attr('opacity', 0.8)
+        .attr('fill', 'var(--primary)');
+    });
+  
+  // Bar labels
+  g.selectAll('.bar-label')
+    .data(data)
+    .enter()
+    .append('text')
+    .attr('class', 'bar-label')
+    .attr('x', d => xScale(d.hour) + xScale.bandwidth() / 2)
+    .attr('y', d => yScale(d.count) - 5)
+    .attr('text-anchor', 'middle')
+    .style('font-size', '12px')
+    .style('font-weight', '600')
+    .style('fill', 'var(--foreground)')
+    .text(d => d.count);
+}
+
 // Generate color for participant line
 function getParticipantColor(index, total) {
   const hue = (index / total) * 360;
@@ -406,7 +600,12 @@ function getParticipantColor(index, total) {
 function renderVisualization() {
   const svg = d3.select('#chart');
   const container = document.querySelector('.chart-container');
-  const width = (container.clientWidth - 20) * 1.4; // 40% wider and less padding
+  
+  // Check if mobile
+  const isMobile = window.innerWidth <= 768;
+  const width = isMobile 
+    ? container.clientWidth - 20  // No extra width on mobile
+    : (container.clientWidth - 20) * 1.4; // 40% wider on desktop
   
   // Use filtered data for rendering - always use filteredData once filters have been initialized
   const dataToRender = filteredData;
@@ -418,7 +617,12 @@ function renderVisualization() {
   const chartHeight = dataToRender.length * participantHeight;
   const height = chartHeight + 100; // Add space for axes
   
-  const margin = { top: 40, right: 200, bottom: 60, left: 300 };
+  const margin = { 
+    top: 40, 
+    right: isMobile ? 20 : 200, 
+    bottom: 60, 
+    left: isMobile ? 150 : 300  // Smaller left margin on mobile
+  };
   const chartWidth = width - margin.left - margin.right;
 
   svg.selectAll('*').remove();
@@ -616,7 +820,7 @@ function renderVisualization() {
     .attr('class', 'axis')
     .call(yAxis)
     .selectAll('text')
-    .style('font-size', '14px')
+    .style('font-size', isMobile ? '10px' : '14px')
     .each(function(d, i) {
       const participant = dataWithSplits[i];
       const isDNF = participant.position === null || participant.position === undefined;
@@ -846,9 +1050,29 @@ function init() {
   // Initialize filters and set initial filtered data to all data
   filteredData = processedData;
   initializeFilters();
+  setupDistributionToggle();
   renderVisualization();
   
   console.log('App initialized successfully!');
+}
+
+// Setup distribution chart toggle
+function setupDistributionToggle() {
+  distributionToggleEl.addEventListener('click', () => {
+    const isExpanded = distributionChartContainerEl.style.display !== 'none';
+    
+    if (isExpanded) {
+      // Collapse
+      distributionChartContainerEl.style.display = 'none';
+      distributionToggleEl.classList.remove('expanded');
+    } else {
+      // Expand
+      distributionChartContainerEl.style.display = 'block';
+      distributionToggleEl.classList.add('expanded');
+      // Use setTimeout to ensure container is visible and has dimensions
+      setTimeout(() => renderDistributionChart(), 10);
+    }
+  });
 }
 
 // Handle race toggle

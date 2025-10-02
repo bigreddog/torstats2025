@@ -33,6 +33,16 @@
     </div>
 
     <div id="content" style="display: none;">
+      <div class="distribution-section">
+        <button id="distribution-toggle" class="distribution-toggle">
+          <i class="ph ph-chart-bar"></i>
+          <span>Finisher Distribution</span>
+          <i class="ph ph-caret-down toggle-icon"></i>
+        </button>
+        <div id="distribution-chart-container" class="distribution-chart-container" style="display: none;">
+          <svg id="distribution-chart"></svg>
+        </div>
+      </div>
       <div class="filters-container" id="filters-container">
         <div class="filter-group search-filter-group">
           <label for="search-filter">Search Participants <span class="search-hint-inline">Example: Smith, 123, Jones</span></label>
